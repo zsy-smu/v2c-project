@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V2C: 视觉与控制协同系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#0ea5e9', // 科技蓝
+                        darkbg: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-darkbg text-slate-300 font-sans antialiased selection:bg-brand selection:text-white">
+
+    <nav class="border-b border-slate-800 bg-slate-900/50 backdrop-blur fixed w-full z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <span class="text-white text-xl font-bold tracking-wider">V2C <span class="text-brand">Project</span></span>
+            <div class="space-x-4 text-sm font-medium">
+                <a href="#features" class="hover:text-white transition">核心特性</a>
+                <a href="#architecture" class="hover:text-white transition">系统架构</a>
+                <a href="#contact" class="px-4 py-2 bg-brand text-white rounded-md hover:bg-sky-400 transition shadow-lg shadow-brand/30">获取 Demo</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
+        <div class="md:w-1/2 space-y-6">
+            <div class="inline-block px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-brand font-mono">
+                Jetson Orin Nano 8G × Unitree G1
+            </div>
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+                赋予机器灵魂：<br>从感知到运动的 <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand to-cyan-300">闭环控制</span>
+            </h1>
+            <p class="text-lg text-slate-400 leading-relaxed">
+                基于 Jetson 边缘计算平台与 MuJoCo 物理引擎，打造端到端的实时视觉-动作协同系统。让 Unitree G1 人形机器人实现“看到即反应”的真实物理交互。
+            </p>
+            <div class="flex gap-4 pt-4">
+                <a href="#demo" class="px-6 py-3 bg-white text-slate-900 font-bold rounded-lg hover:bg-slate-200 transition">观看演示视频</a>
+                <a href="https://github.com" target="_blank" class="px-6 py-3 bg-slate-800 text-white font-bold rounded-lg border border-slate-700 hover:bg-slate-700 transition">GitHub 源码</a>
+            </div>
+        </div>
+        
+        <div class="md:w-1/2 w-full relative group">
+            <div class="absolute -inset-1 bg-gradient-to-r from-brand to-cyan-400 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+            <div class="relative bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-2xl aspect-video flex items-center justify-center">
+                <p class="text-slate-500 font-mono text-sm">[此处放入: YOLO识别画面 | MuJoCo仿真画面]</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="py-20 bg-slate-900 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-white">硬核技术栈</h2>
+                <p class="mt-4 text-slate-400">打通计算机视觉与机器人学的最后一公里</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 hover:-translate-y-2 transition duration-300">
+                    <div class="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center mb-6 text-2xl">👁️</div>
+                    <h3 class="text-xl font-bold text-white mb-3">端侧极致推理</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">部署于 Jetson Orin Nano 超级算力平台，利用轻量化 YOLO 模型实现高帧率目标检测，精准捕捉并分类场景元素（如：水果、猫、猪、飞机等关键目标）。</p>
+                </div>
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-brand/10 rounded-bl-full blur-2xl"></div>
+                    <div class="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center mb-6 text-2xl">🧠</div>
+                    <h3 class="text-xl font-bold text-white mb-3">Sim-to-Sim 动力学仿真</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">告别简单的运动学回放。打通视觉信号与 MuJoCo 物理引擎，在带重力和碰撞的复杂物理世界中，实时计算 G1 人形机器人的全姿态平衡与关节扭矩。</p>
+                </div>
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 hover:-translate-y-2 transition duration-300">
+                    <div class="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center mb-6 text-2xl">⚡</div>
+                    <h3 class="text-xl font-bold text-white mb-3">毫秒级低延迟响应</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">构建高效的数据传输链路，将视觉端的目标坐标与类别特征，无缝转化为控制端 MDP（马尔可夫决策过程）的状态输入，实现真正的“看到即反应”。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture" class="py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold text-white mb-12">系统数据流向</h2>
+            <div class="bg-slate-800/50 p-6 rounded-xl border border-slate-700 font-mono text-sm text-brand flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="p-4 bg-slate-800 rounded-lg border border-slate-600 shadow-lg">Webcam / 视频流</div>
+                <div class="text-slate-500 text-xl animate-pulse">→</div>
+                <div class="p-4 bg-slate-800 rounded-lg border border-slate-600 shadow-lg border-b-2 border-b-brand">Jetson Orin Nano<br><span class="text-xs text-slate-400">YOLO Inference</span></div>
+                <div class="text-slate-500 text-xl animate-pulse">→</div>
+                <div class="p-4 bg-slate-800 rounded-lg border border-slate-600 shadow-lg border-b-2 border-b-emerald-400">Socket / ROS 通信</div>
+                <div class="text-slate-500 text-xl animate-pulse">→</div>
+                <div class="p-4 bg-slate-800 rounded-lg border border-slate-600 shadow-lg border-b-2 border-b-cyan-400">MuJoCo 环境<br><span class="text-xs text-slate-400">G1 RL Policy</span></div>
+            </div>
+        </div>
+    </section>
+
+    <footer id="contact" class="bg-slate-950 py-12 border-t border-slate-800 text-center">
+        <div class="max-w-7xl mx-auto px-4">
+            <h2 class="text-2xl font-bold text-white mb-4">准备好体验具身智能了吗？</h2>
+            <p class="text-slate-500 mb-8">致力于探索具身智能的无限可能。</p>
+            <div class="flex justify-center gap-6 text-sm text-slate-400">
+                <p>Developer: <strong>Zsy</strong></p>
+                <p>|</p>
+                <p>Shanghai Maritime University</p>
+            </div>
+            <p class="text-xs text-slate-600 mt-8">© 2026 V2C Project. All rights reserved.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
