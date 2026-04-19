@@ -2,7 +2,7 @@
 # =============================================================
 # V2C Project — GPIO 物理按键触发后端接口示例
 # 文件：gpio_demo/gpio_button.py
-# 功能：监听树莓派物理按键，按下时向后端服务发送 HTTP 请求
+# 功能：监听 Jetson 物理按键，按下时向后端服务发送 HTTP 请求
 # 默认状态：关闭（需通过环境变量 启用GPIO按键=true 开启）
 #
 # 硬件接线说明：
@@ -10,15 +10,11 @@
 #   - 轻触按钮另一端 → GND（物理引脚 6，或任意 GND 引脚）
 #   - 内部上拉电阻已启用，无需额外连接 3.3V
 #
-# 树莓派引脚对照（BCM 编号）：
-#   物理引脚 1  = 3.3V 电源
-#   物理引脚 6  = GND 接地
-#   物理引脚 11 = GPIO 17（本脚本默认按钮引脚）
-#   物理引脚 13 = GPIO 27（可选备用引脚）
+# Jetson 引脚对照请参考官方 Pinout（本脚本默认 BCM GPIO 17）
 #
 # 使用方法：
-#   # 安装依赖（树莓派 OS 通常已预装）
-#   sudo apt install -y python3-rpi.gpio python3-requests
+#   # 安装依赖（Jetson）
+#   pip3 install Jetson.GPIO
 #
 #   # 设置环境变量开启 GPIO 功能
 #   export 启用GPIO按键=true
@@ -77,16 +73,22 @@ def 检查GPIO功能是否开启():
 
 def 导入GPIO库():
     """
-    导入 RPi.GPIO 库，仅在树莓派上可用。
-    如果在非树莓派设备上运行，会抛出导入错误并给出提示。
+    优先导入 Jetson.GPIO（Jetson 平台）；
+    若不可用，则回退导入 RPi.GPIO（兼容旧环境）。
     """
     try:
-        import RPi.GPIO as GPIO
+        import Jetson.GPIO as GPIO
+        日志.info("GPIO 库：Jetson.GPIO")
         return GPIO
     except ImportError:
-        日志.error("无法导入 RPi.GPIO 库")
-        日志.error("请确认：1) 当前设备是树莓派  2) 已安装：sudo apt install python3-rpi.gpio")
-        sys.exit(1)
+        try:
+            import RPi.GPIO as GPIO
+            日志.warning("未检测到 Jetson.GPIO，已回退到 RPi.GPIO 兼容模式")
+            return GPIO
+        except ImportError:
+            日志.error("无法导入 GPIO 库（Jetson.GPIO / RPi.GPIO）")
+            日志.error("Jetson 请执行：pip3 install Jetson.GPIO")
+            sys.exit(1)
     except RuntimeError as 错误:
         日志.error(f"GPIO 初始化失败：{错误}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
@@ -157,7 +159,7 @@ def 初始化GPIO(GPIO):
         bouncetime=int(防抖延迟 * 1000)       # 防抖时间（毫秒）
     )
 
-    日志.info(f"GPIO 初始化完成，监听引脚：GPIO {GPIO按钮引脚}（物理引脚 11）")
+    日志.info(f"GPIO 初始化完成，监听引脚：GPIO {GPIO按钮引脚}")
     日志.info("按下物理按键以触发后端接口...")
 
 
