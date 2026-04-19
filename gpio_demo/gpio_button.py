@@ -76,23 +76,35 @@ def 导入GPIO库():
     优先导入 Jetson.GPIO（Jetson 平台）；
     若不可用，则回退导入 RPi.GPIO（兼容旧环境）。
     """
+    Jetson导入错误 = None
+    RPi导入错误 = None
+
     try:
         import Jetson.GPIO as GPIO
         日志.info("GPIO 库：Jetson.GPIO")
         return GPIO
     except ImportError:
-        try:
-            import RPi.GPIO as GPIO
-            日志.warning("未检测到 Jetson.GPIO，已回退到 RPi.GPIO 兼容模式")
-            return GPIO
-        except ImportError:
-            日志.error("无法导入 GPIO 库（Jetson.GPIO / RPi.GPIO）")
-            日志.error("Jetson 请执行：pip3 install Jetson.GPIO")
-            sys.exit(1)
+        Jetson导入错误 = "ImportError"
     except RuntimeError as 错误:
-        日志.error(f"GPIO 初始化失败：{错误}")
+        Jetson导入错误 = 错误
+
+    try:
+        import RPi.GPIO as GPIO
+        日志.warning("未检测到 Jetson.GPIO，已回退到 RPi.GPIO 兼容模式")
+        return GPIO
+    except ImportError:
+        RPi导入错误 = "ImportError"
+    except RuntimeError as 错误:
+        RPi导入错误 = 错误
+
+    if isinstance(Jetson导入错误, RuntimeError) or isinstance(RPi导入错误, RuntimeError):
+        日志.error(f"GPIO 初始化失败：Jetson={Jetson导入错误}, RPi={RPi导入错误}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
-        sys.exit(1)
+    else:
+        日志.error("无法导入 GPIO 库（Jetson.GPIO / RPi.GPIO）")
+        日志.error("Jetson 请执行：pip3 install Jetson.GPIO")
+
+    sys.exit(1)
 
 
 def 发送触发请求():
