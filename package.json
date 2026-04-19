@@ -1,0 +1,16 @@
+{
+  "name": "v2c-project",
+  "version": "1.0.0",
+  "description": "V2C：视觉与控制协同系统后端服务 — Jetson Orin Nano Super 8G",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["jetson", "vision", "control", "robotics", "v2c"],
+  "author": "Zsy @ 上海海事大学",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
