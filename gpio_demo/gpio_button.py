@@ -2,26 +2,27 @@
 # =============================================================
 # V2C Project — GPIO 物理按键触发后端接口示例
 # 文件：gpio_demo/gpio_button.py
-# 功能：监听树莓派物理按键，按下时向后端服务发送 HTTP 请求
-# 默认状态：关闭（需通过环境变量 启用GPIO按键=true 开启）
+# 功能：监听物理按键，按下时向后端服务发送 HTTP 请求
+# 默认状态：关闭（需通过环境变量 GPIO_ENABLE=true 开启）
 #
-# 硬件接线说明：
+# 硬件接线说明（树莓派 / Jetson 通用）：
 #   - 轻触按钮一端 → GPIO 17 引脚（物理引脚 11）
 #   - 轻触按钮另一端 → GND（物理引脚 6，或任意 GND 引脚）
 #   - 内部上拉电阻已启用，无需额外连接 3.3V
 #
-# 树莓派引脚对照（BCM 编号）：
-#   物理引脚 1  = 3.3V 电源
-#   物理引脚 6  = GND 接地
-#   物理引脚 11 = GPIO 17（本脚本默认按钮引脚）
-#   物理引脚 13 = GPIO 27（可选备用引脚）
+# 支持的 GPIO 库（自动探测）：
+#   - 树莓派：RPi.GPIO   安装：sudo apt install python3-rpi.gpio
+#   - Jetson：Jetson.GPIO 安装：sudo pip3 install Jetson.GPIO
+#             （JetPack 通常已预装，或 pip3 install Jetson.GPIO）
+#
+# 树莓派 / Jetson BCM 引脚编号示例：
+#   物理引脚  6  = GND 接地
+#   物理引脚 11  = GPIO 17（本脚本默认按钮引脚）
+#   物理引脚 13  = GPIO 27（可选备用引脚）
 #
 # 使用方法：
-#   # 安装依赖（树莓派 OS 通常已预装）
-#   sudo apt install -y python3-rpi.gpio python3-requests
-#
 #   # 设置环境变量开启 GPIO 功能
-#   export 启用GPIO按键=true
+#   export GPIO_ENABLE=true
 #
 #   # 运行脚本
 #   python3 gpio_demo/gpio_button.py
@@ -43,20 +44,20 @@ logging.basicConfig(
 日志 = logging.getLogger("GPIO按键监听")
 
 # -------------------------------------------------------
-# 从环境变量读取配置（默认值见下方注释）
+# 从环境变量读取配置（key 使用标准 ASCII 命名，兼容 systemd EnvironmentFile）
 # -------------------------------------------------------
 
-# 是否启用 GPIO 按键功能（环境变量：启用GPIO按键，默认：false）
-GPIO功能已启用 = os.environ.get("启用GPIO按键", "false").lower() == "true"
+# 是否启用 GPIO 按键功能（环境变量：GPIO_ENABLE，默认：false）
+GPIO功能已启用 = os.environ.get("GPIO_ENABLE", "false").lower() == "true"
 
-# GPIO 按钮连接的引脚编号，使用 BCM 编号（环境变量：GPIO按钮引脚，默认：17）
-GPIO按钮引脚 = int(os.environ.get("GPIO按钮引脚", "17"))
+# GPIO 按钮连接的引脚编号，使用 BCM 编号（环境变量：GPIO_BUTTON_PIN，默认：17）
+GPIO按钮引脚 = int(os.environ.get("GPIO_BUTTON_PIN", "17"))
 
-# 触发时调用的后端接口地址（环境变量：GPIO触发接口路径，默认：/api/trigger）
-触发接口路径 = os.environ.get("GPIO触发接口路径", "/api/trigger")
+# 触发时调用的后端接口地址（环境变量：GPIO_TRIGGER_PATH，默认：/api/trigger）
+触发接口路径 = os.environ.get("GPIO_TRIGGER_PATH", "/api/trigger")
 
-# 后端服务端口（环境变量：服务端口，默认：3000）
-后端端口 = int(os.environ.get("服务端口", "3000"))
+# 后端服务端口（环境变量：PORT，默认：3000）
+后端端口 = int(os.environ.get("PORT", "3000"))
 
 # 完整的触发接口 URL
 触发接口地址 = f"http://127.0.0.1:{后端端口}{触发接口路径}"
@@ -69,28 +70,48 @@ def 检查GPIO功能是否开启():
     """检查环境变量，未开启时打印说明并退出"""
     if not GPIO功能已启用:
         日志.warning("GPIO 按键功能未启用")
-        日志.warning("如需开启，请设置环境变量：export 启用GPIO按键=true")
-        日志.warning("或在 .env 文件中将「启用GPIO按键」改为 true")
+        日志.warning("如需开启，请设置环境变量：export GPIO_ENABLE=true")
+        日志.warning("或在 .env 文件中将「GPIO_ENABLE」改为 true")
         日志.info("程序退出（功能默认关闭，安全退出，无任何影响）")
         sys.exit(0)
 
 
 def 导入GPIO库():
     """
-    导入 RPi.GPIO 库，仅在树莓派上可用。
-    如果在非树莓派设备上运行，会抛出导入错误并给出提示。
+    自动探测并导入 GPIO 库：
+      - 优先尝试 RPi.GPIO（树莓派）
+      - 若失败，再尝试 Jetson.GPIO（Jetson 系列）
+    两者 API 完全兼容，其余代码无需修改。
     """
+    # 先尝试树莓派 GPIO 库
     try:
         import RPi.GPIO as GPIO
+        日志.info("已加载 GPIO 库：RPi.GPIO（树莓派模式）")
         return GPIO
     except ImportError:
-        日志.error("无法导入 RPi.GPIO 库")
-        日志.error("请确认：1) 当前设备是树莓派  2) 已安装：sudo apt install python3-rpi.gpio")
-        sys.exit(1)
+        pass
     except RuntimeError as 错误:
-        日志.error(f"GPIO 初始化失败：{错误}")
+        日志.error(f"RPi.GPIO 初始化失败：{错误}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
         sys.exit(1)
+
+    # 树莓派库不可用，尝试 Jetson GPIO 库
+    try:
+        import Jetson.GPIO as GPIO
+        日志.info("已加载 GPIO 库：Jetson.GPIO（Jetson 模式）")
+        return GPIO
+    except ImportError:
+        pass
+    except RuntimeError as 错误:
+        日志.error(f"Jetson.GPIO 初始化失败：{错误}")
+        日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
+        sys.exit(1)
+
+    # 两者均不可用
+    日志.error("无法导入 GPIO 库（RPi.GPIO 或 Jetson.GPIO）")
+    日志.error("树莓派：sudo apt install python3-rpi.gpio")
+    日志.error("Jetson ：sudo pip3 install Jetson.GPIO")
+    sys.exit(1)
 
 
 def 发送触发请求():
@@ -190,7 +211,7 @@ def main():
     # 第一步：检查功能开关
     检查GPIO功能是否开启()
 
-    # 第二步：导入 GPIO 库
+    # 第二步：导入 GPIO 库（自动探测 RPi.GPIO / Jetson.GPIO）
     GPIO = 导入GPIO库()
 
     # 第三步：初始化 GPIO 引脚
