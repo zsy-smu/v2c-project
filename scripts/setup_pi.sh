@@ -1,271 +1,174 @@
-#!/bin/bash
-# =============================================================
-# V2C Project — 树莓派一键部署脚本
-# 文件：scripts/setup_pi.sh
+#!/usr/bin/env bash
+# setup_pi.sh — V2C Project 树莓派一键部署脚本 / One-shot Raspberry Pi bootstrap
 # 适用：树莓派 4B / 5，Raspberry Pi OS Lite 64-bit
-# 使用方法：
-#   chmod +x scripts/setup_pi.sh
-#   ./scripts/setup_pi.sh
-# =============================================================
+# 使用方法 / Usage:
+#   bash scripts/setup_pi.sh
+# Run as the 'pi' user (not root). Uses sudo internally where needed.
+set -euo pipefail
 
-# 设置脚本在任意命令失败时立即退出，避免错误继续蔓延
-set -e
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NODE_VERSION="22"
+CURRENT_USER="$(whoami)"
 
-# -------------------------------------------------------
-# 全局变量定义
-# -------------------------------------------------------
-# 项目根目录（以脚本所在位置的上级目录为准）
-项目目录=$(cd "$(dirname "$0")/.." && pwd)
+log()  { echo -e "\033[1;32m[信息]\033[0m $*"; }
+warn() { echo -e "\033[1;33m[警告]\033[0m $*"; }
+die()  { echo -e "\033[1;31m[错误]\033[0m $*" >&2; exit 1; }
 
-# 当前操作系统用户名
-当前用户=$(whoami)
-
-# 后端服务名称（与 systemd 服务文件名对应）
-服务名称="v2c-backend"
-
-# systemd 服务文件存放路径
-系统服务目录="/etc/systemd/system"
-
-# -------------------------------------------------------
-# 彩色输出辅助函数
-# -------------------------------------------------------
-打印信息() {
-    echo -e "\033[32m[信息]\033[0m $1"
-}
-
-打印警告() {
-    echo -e "\033[33m[警告]\033[0m $1"
-}
-
-打印错误() {
-    echo -e "\033[31m[错误]\033[0m $1"
-}
-
-打印标题() {
+print_title() {
     echo ""
     echo -e "\033[36m=========================================\033[0m"
     echo -e "\033[36m  $1\033[0m"
     echo -e "\033[36m=========================================\033[0m"
 }
 
-# -------------------------------------------------------
-# 检查是否以 root 或 sudo 执行（systemd 操作需要权限）
-# -------------------------------------------------------
-检查权限() {
-    if [ "$EUID" -ne 0 ]; then
-        打印警告 "部分操作需要管理员权限，请在提示时输入密码"
-    fi
-}
+print_title "V2C Project — 树莓派一键部署脚本 v1.1"
+echo -e "  项目目录：${PROJECT_DIR}"
+echo -e "  当前用户：${CURRENT_USER}"
 
-# -------------------------------------------------------
-# 第一步：更新系统软件包
-# -------------------------------------------------------
-更新系统() {
-    打印标题 "第一步：更新系统软件包"
-    打印信息 "正在更新软件包列表，请稍候..."
-    sudo apt update -qq
-    打印信息 "软件包列表更新完成"
+# Check not running as root directly
+if [ "$EUID" -eq 0 ]; then
+    warn "建议以普通用户（如 pi）运行此脚本，脚本会在需要时自动 sudo。"
+fi
 
-    打印信息 "正在升级已安装的软件包..."
-    sudo apt upgrade -y -qq
-    打印信息 "系统升级完成 ✓"
-}
+# ── 1. System update / 更新系统软件包 ────────────────────────────────────────
+print_title "第一步：更新系统软件包"
+log "正在更新软件包列表..."
+sudo apt-get update -qq
+log "正在升级已安装的软件包..."
+sudo apt-get upgrade -y -qq
+log "系统升级完成 ✓"
 
-# -------------------------------------------------------
-# 第二步：安装基础工具
-# -------------------------------------------------------
-安装基础工具() {
-    打印标题 "第二步：安装基础工具"
-    打印信息 "正在安装 git、curl、wget、vim..."
-    sudo apt install -y git curl wget vim -qq
-    打印信息 "基础工具安装完成 ✓"
-}
+# ── 2. Install system tools / 安装基础工具 ───────────────────────────────────
+print_title "第二步：安装基础工具"
+log "正在安装 git、curl、wget、vim、sqlite3..."
+sudo apt-get install -y -qq \
+    git curl wget vim ca-certificates \
+    python3 python3-pip python3-venv \
+    sqlite3
+log "基础工具安装完成 ✓"
 
-# -------------------------------------------------------
-# 第三步：安装 Node.js 运行环境
-# -------------------------------------------------------
-安装Node环境() {
-    打印标题 "第三步：安装 Node.js 运行环境"
+# ── 3. Docker / 安装 Docker ───────────────────────────────────────────────────
+print_title "第三步：安装 Docker"
+if ! command -v docker &>/dev/null; then
+    log "正在安装 Docker..."
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker "$CURRENT_USER"
+    warn "Docker 已安装。如需立即使用，请执行 'newgrp docker' 或重新登录。"
+else
+    log "Docker 已安装：$(docker --version)"
+fi
 
-    # 检查是否已安装 Node.js
-    if command -v node &>/dev/null; then
-        当前版本=$(node -v)
-        打印信息 "Node.js 已安装，当前版本：$当前版本，跳过此步骤"
-        return
-    fi
+# ── 4. Node.js via nvm / 安装 Node.js ────────────────────────────────────────
+print_title "第四步：安装 Node.js ${NODE_VERSION}（nvm）"
+export NVM_DIR="$HOME/.nvm"
+if [ ! -d "$NVM_DIR" ]; then
+    log "正在安装 nvm..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+fi
+# shellcheck source=/dev/null
+source "$NVM_DIR/nvm.sh"
+log "正在安装 Node.js ${NODE_VERSION}..."
+nvm install "$NODE_VERSION"
+nvm use "$NODE_VERSION"
+nvm alias default "$NODE_VERSION"
+log "Node.js 安装完成：$(node -v)  npm：$(npm -v) ✓"
 
-    打印信息 "正在通过 NodeSource 安装 Node.js v20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - -q
-    sudo apt install -y nodejs -qq
+# ── 5. Python venv + dependencies / 安装 Python 环境 ─────────────────────────
+print_title "第五步：安装 Python 虚拟环境和依赖"
+log "正在创建 venv..."
+python3 -m venv "$PROJECT_DIR/venv"
+log "正在安装 Python 依赖（aiohttp requests cryptography pycryptodome srp pbkdf2）..."
+"$PROJECT_DIR/venv/bin/pip3" install --upgrade pip -q
+"$PROJECT_DIR/venv/bin/pip3" install -q \
+    aiohttp requests cryptography pycryptodome srp pbkdf2
+log "Python 环境配置完成 ✓"
 
-    打印信息 "Node.js 安装完成 ✓"
-    打印信息 "  Node.js 版本：$(node -v)"
-    打印信息 "  npm 版本：$(npm -v)"
-}
+# ── 6. Node.js project dependencies / 安装项目 Node 依赖 ─────────────────────
+print_title "第六步：安装项目 Node.js 依赖"
+cd "$PROJECT_DIR"
+npm install --silent
+log "npm install 完成 ✓"
 
-# -------------------------------------------------------
-# 第四步：安装 Python 环境（GPIO 脚本依赖）
-# -------------------------------------------------------
-安装Python环境() {
-    打印标题 "第四步：安装 Python 3 运行环境"
+# ── 7. Environment file / 配置环境变量 ───────────────────────────────────────
+print_title "第七步：配置环境变量"
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    log "正在从 .env.example 创建 .env..."
+    cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+    # Default to venv python
+    sed -i "s|^PYTHON_CMD=.*|PYTHON_CMD=$PROJECT_DIR/venv/bin/python3|" "$PROJECT_DIR/.env"
+    warn "请编辑 $PROJECT_DIR/.env 填写实际配置（Apple ID 账号等）。"
+    warn "执行：nano $PROJECT_DIR/.env"
+else
+    log ".env 已存在，跳过创建。"
+fi
 
-    打印信息 "正在安装 Python 3、pip 及 GPIO 库..."
-    sudo apt install -y python3 python3-pip python3-venv python3-rpi.gpio -qq
+# ── 8. Keys directory / 创建 keys 目录 ───────────────────────────────────────
+mkdir -p "$PROJECT_DIR/keys"
+log "keys/ 目录已就绪，请将 .key 文件放入：$PROJECT_DIR/keys/"
 
-    打印信息 "Python 环境安装完成 ✓"
-    打印信息 "  Python 版本：$(python3 --version)"
-}
+# ── 9. Logs directory / 创建日志目录 ─────────────────────────────────────────
+mkdir -p "$PROJECT_DIR/logs"
+log "logs/ 目录已就绪 ✓"
 
-# -------------------------------------------------------
-# 第五步：安装 Node.js 项目依赖
-# -------------------------------------------------------
-安装项目依赖() {
-    打印标题 "第五步：安装项目依赖"
+# ── 10. Anisette Docker container / 启动 Anisette 容器 ───────────────────────
+print_title "第八步：启动 Anisette Docker 容器"
+docker network create mh-network 2>/dev/null || true
+if ! docker ps -a --format '{{.Names}}' | grep -q '^anisette$'; then
+    log "正在拉取并启动 Anisette 容器..."
+    docker run -d --restart always --name anisette \
+        -p 6969:6969 \
+        --volume anisette-v3_data:/home/Alcoholic/.config/anisette-v3/ \
+        --network mh-network \
+        dadoum/anisette-v3-server
+    log "Anisette 容器已启动 ✓"
+else
+    docker start anisette 2>/dev/null || true
+    log "Anisette 容器已存在，确保运行中 ✓"
+fi
 
-    cd "$项目目录"
+# ── 11. systemd services / 配置 systemd 开机自启 ─────────────────────────────
+print_title "第九步：配置 systemd 开机自启"
 
-    if [ -f "package.json" ]; then
-        打印信息 "检测到 package.json，正在运行 npm install..."
-        npm install --silent
-        打印信息 "Node.js 项目依赖安装完成 ✓"
-    else
-        打印警告 "未找到 package.json，跳过 npm install"
-    fi
+NODE_BIN_PATH="$(nvm which "$NODE_VERSION" 2>/dev/null || which node)"
+NODE_BIN_DIR="$(dirname "$NODE_BIN_PATH")"
 
-    if [ -f "requirements.txt" ]; then
-        打印信息 "检测到 requirements.txt，正在运行 pip install..."
-        pip3 install -r requirements.txt -q
-        打印信息 "Python 项目依赖安装完成 ✓"
-    fi
-}
+for UNIT in v2c-server.service v2c-report.service v2c-report.timer; do
+    SRC="$PROJECT_DIR/deploy/systemd/$UNIT"
+    DST="/etc/systemd/system/$UNIT"
+    sed \
+        -e "s|/home/pi/v2c-project|$PROJECT_DIR|g" \
+        -e "s|User=pi|User=$CURRENT_USER|g" \
+        -e "s|/home/pi/.nvm/versions/node/v22/bin|$NODE_BIN_DIR|g" \
+        "$SRC" | sudo tee "$DST" > /dev/null
+    log "  已安装：$UNIT → $DST"
+done
 
-# -------------------------------------------------------
-# 第六步：初始化环境变量文件
-# -------------------------------------------------------
-配置环境变量() {
-    打印标题 "第六步：配置环境变量"
+sudo systemctl daemon-reload
+sudo systemctl enable --now v2c-server.service
+sudo systemctl enable --now v2c-report.timer
+log "systemd 服务配置完成，开机自启已启用 ✓"
 
-    cd "$项目目录"
+# ── 12. GPIO library (optional) / 可选 GPIO 库 ───────────────────────────────
+if grep -q "^ENABLE_GPIO=true" "$PROJECT_DIR/.env" 2>/dev/null; then
+    log "检测到 ENABLE_GPIO=true，正在安装 RPi.GPIO 库..."
+    "$PROJECT_DIR/venv/bin/pip3" install -q RPi.GPIO
+fi
 
-    if [ ! -f ".env" ]; then
-        if [ -f ".env.example" ]; then
-            cp .env.example .env
-            打印信息 ".env 文件已从模板创建 ✓"
-            打印警告 "请编辑 .env 文件，填写你的实际配置：nano $项目目录/.env"
-        else
-            打印警告 "未找到 .env.example，请手动创建 .env 文件"
-        fi
-    else
-        打印信息 ".env 文件已存在，跳过创建"
-    fi
-}
+# ── Done / 完成 ───────────────────────────────────────────────────────────────
+LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "树莓派IP")
 
-# -------------------------------------------------------
-# 第七步：安装并启用 systemd 服务
-# -------------------------------------------------------
-配置系统服务() {
-    打印标题 "第七步：配置 systemd 开机自启服务"
-
-    服务文件="$项目目录/deploy/systemd/${服务名称}.service"
-
-    if [ ! -f "$服务文件" ]; then
-        打印错误 "未找到服务文件：$服务文件"
-        打印错误 "请确认 deploy/systemd/${服务名称}.service 文件存在"
-        return 1
-    fi
-
-    # 将服务文件中的用户占位符替换为当前用户名
-    打印信息 "正在将服务文件中的用户名替换为：$当前用户"
-    sudo sed "s/User=pi/User=$当前用户/g; s/Group=pi/Group=$当前用户/g; s|/home/pi|/home/$当前用户|g" \
-        "$服务文件" > "/tmp/${服务名称}.service"
-
-    # 复制服务文件到 systemd 目录
-    sudo cp "/tmp/${服务名称}.service" "$系统服务目录/${服务名称}.service"
-    打印信息 "服务文件已复制到 $系统服务目录 ✓"
-
-    # 重新加载 systemd 配置
-    sudo systemctl daemon-reload
-    打印信息 "systemd 配置已重新加载 ✓"
-
-    # 启用开机自启
-    sudo systemctl enable "${服务名称}.service"
-    打印信息 "开机自启已启用 ✓"
-
-    # 启动服务
-    打印信息 "正在启动 V2C 后端服务..."
-    sudo systemctl start "${服务名称}.service"
-
-    # 等待 2 秒后检查状态
-    sleep 2
-    if sudo systemctl is-active --quiet "${服务名称}.service"; then
-        打印信息 "V2C 后端服务启动成功 ✓"
-    else
-        打印警告 "服务可能未能正常启动，请检查日志："
-        打印警告 "  sudo journalctl -u ${服务名称}.service -n 30 --no-pager"
-    fi
-}
-
-# -------------------------------------------------------
-# 第八步：创建日志目录
-# -------------------------------------------------------
-创建日志目录() {
-    打印标题 "第八步：创建日志目录"
-
-    日志目录="$项目目录/logs"
-    if [ ! -d "$日志目录" ]; then
-        mkdir -p "$日志目录"
-        打印信息 "日志目录已创建：$日志目录 ✓"
-    else
-        打印信息 "日志目录已存在，跳过创建"
-    fi
-}
-
-# -------------------------------------------------------
-# 完成提示
-# -------------------------------------------------------
-打印完成提示() {
-    打印标题 "🎉 部署完成！"
-
-    # 获取本机局域网 IP 地址
-    本机IP=$(hostname -I | awk '{print $1}')
-
-    echo ""
-    打印信息 "V2C 后端服务已成功部署到树莓派！"
-    echo ""
-    echo -e "  📡 局域网访问地址：\033[32mhttp://${本机IP}:3000\033[0m"
-    echo -e "  📋 查看服务状态：\033[33msudo systemctl status ${服务名称}\033[0m"
-    echo -e "  📋 查看实时日志：\033[33msudo journalctl -u ${服务名称} -f\033[0m"
-    echo -e "  📋 手动停止服务：\033[33msudo systemctl stop ${服务名称}\033[0m"
-    echo -e "  📋 手动重启服务：\033[33msudo systemctl restart ${服务名称}\033[0m"
-    echo ""
-    打印警告 "注意：如果 .env 文件中有未填写的配置项，服务可能无法正常运行。"
-    打印警告 "请执行：nano $项目目录/.env  完成配置后重启服务。"
-    echo ""
-}
-
-# -------------------------------------------------------
-# 主流程：按顺序执行所有步骤
-# -------------------------------------------------------
-主流程() {
-    echo ""
-    echo -e "\033[36m====================================================\033[0m"
-    echo -e "\033[36m    V2C Project — 树莓派一键部署脚本 v1.0\033[0m"
-    echo -e "\033[36m    项目目录：$项目目录\033[0m"
-    echo -e "\033[36m    当前用户：$当前用户\033[0m"
-    echo -e "\033[36m====================================================\033[0m"
-    echo ""
-
-    检查权限
-    更新系统
-    安装基础工具
-    安装Node环境
-    安装Python环境
-    安装项目依赖
-    配置环境变量
-    创建日志目录
-    配置系统服务
-    打印完成提示
-}
-
-# 执行主流程
-主流程
+print_title "🎉 部署完成！"
+echo ""
+log "V2C 后端服务已成功部署到树莓派！"
+echo ""
+echo -e "  📡 局域网访问地址：\033[32mhttp://${LOCAL_IP}:3000\033[0m"
+echo -e "  🩺 健康检查：\033[33mcurl http://localhost:3000/health\033[0m"
+echo -e "  📋 查看服务状态：\033[33msudo systemctl status v2c-server\033[0m"
+echo -e "  📋 查看实时日志：\033[33msudo journalctl -u v2c-server -f\033[0m"
+echo ""
+warn "下一步："
+warn "  1. 复制 .key 文件到 $PROJECT_DIR/keys/"
+warn "  2. 完成 Apple 认证：cd $PROJECT_DIR && python3 request_reports.py"
+warn "  3. 验证服务：bash $PROJECT_DIR/scripts/check_service.sh"
+warn "  4. 完整部署文档：$PROJECT_DIR/docs/raspberry-pi-deploy.md"
+echo ""

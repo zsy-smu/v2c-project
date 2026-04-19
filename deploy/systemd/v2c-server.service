@@ -1,0 +1,23 @@
+[Unit]
+Description=V2C Project — NinjiaTag Query Server
+Documentation=https://github.com/zsy-smu/v2c-project
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/v2c-project
+EnvironmentFile=/home/pi/v2c-project/.env
+ExecStart=/home/pi/.nvm/versions/node/v22/bin/node server.mjs
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=v2c-server
+
+# Resource limits — keep Pi stable under load
+LimitNOFILE=65536
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

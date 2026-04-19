@@ -1,29 +1,40 @@
 # =============================================================
-# V2C Project — Git 忽略文件配置
-# 以下文件不会上传到 GitHub，保护敏感信息
+# V2C Project — .gitignore
+# 以下文件/目录不会上传到 GitHub，保护敏感信息
 # =============================================================
 
-# 环境变量文件（包含敏感配置，不上传）
+# Environment secrets / 环境变量（含敏感配置）
 .env
 
-# 日志目录
-logs/
-
-# Node.js 依赖目录
+# Dependencies / Node.js 依赖
 node_modules/
 
-# Python 虚拟环境
+# Python virtual environment / Python 虚拟环境
 venv/
 .venv/
 __pycache__/
 *.pyc
 *.pyo
 
-# 操作系统生成的文件
+# Runtime data / 运行时数据
+reports.db
+*.db-shm
+*.db-wal
+
+# Key files — NEVER commit private keys / 私钥文件（绝对不能提交）
+keys/*.key
+keys/*.json
+
+# Logs / 日志
+logs/
+*.log
+npm-debug.log*
+
+# macOS
 .DS_Store
 Thumbs.db
 
-# 编辑器配置文件
+# Editor / 编辑器配置
 .vscode/
 .idea/
 *.swp

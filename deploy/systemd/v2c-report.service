@@ -1,0 +1,17 @@
+[Unit]
+Description=V2C Project — NinjiaTag Apple FindMy Report Fetcher (single run)
+Documentation=https://github.com/zsy-smu/v2c-project
+After=network.target v2c-server.service
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/v2c-project
+EnvironmentFile=/home/pi/v2c-project/.env
+ExecStart=/bin/bash -c '"${PYTHON_CMD:-python3}" request_reports.py'
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=v2c-report
+
+[Install]
+WantedBy=multi-user.target

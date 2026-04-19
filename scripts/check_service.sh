@@ -1,217 +1,104 @@
-#!/bin/bash
-# =============================================================
+#!/usr/bin/env bash
+# check_service.sh — Verify V2C Project service health on Raspberry Pi
 # V2C Project — 服务状态检查脚本
-# 文件：scripts/check_service.sh
-# 功能：一键检查 V2C 后端服务的运行状态、端口监听、日志输出
-# 使用方法：
-#   chmod +x scripts/check_service.sh
-#   ./scripts/check_service.sh
-# =============================================================
+# Usage / 使用方法: bash scripts/check_service.sh [host] [port]
+set -euo pipefail
 
-# -------------------------------------------------------
-# 配置项（按实际情况修改）
-# -------------------------------------------------------
-# 服务名称（与 systemd 服务文件名保持一致）
-服务名称="v2c-backend"
+HOST="${1:-localhost}"
+PORT="${2:-3000}"
+URL="http://${HOST}:${PORT}/health"
 
-# 后端服务监听的端口号
-服务端口=3000
+PASS="\033[1;32m✅\033[0m"
+FAIL="\033[1;31m❌\033[0m"
+INFO="\033[1;34mℹ️\033[0m"
 
-# 最近显示的日志行数
-日志行数=20
+echo -e "${INFO}  V2C Project — 服务状态检查 / Service Health Check"
+echo -e "${INFO}  Target: ${URL}"
+echo "────────────────────────────────────────"
 
-# -------------------------------------------------------
-# 彩色输出辅助函数
-# -------------------------------------------------------
-打印成功() {
-    echo -e "  \033[32m✓\033[0m $1"
-}
-
-打印失败() {
-    echo -e "  \033[31m✗\033[0m $1"
-}
-
-打印信息() {
-    echo -e "  \033[34mℹ\033[0m $1"
-}
-
-打印分隔线() {
-    echo -e "\033[90m-----------------------------------------------\033[0m"
-}
-
-# -------------------------------------------------------
-# 检查 systemd 服务运行状态
-# -------------------------------------------------------
-检查服务状态() {
-    echo ""
-    echo -e "\033[1m【1】systemd 服务状态\033[0m"
-    打印分隔线
-
-    if systemctl is-active --quiet "${服务名称}.service" 2>/dev/null; then
-        打印成功 "服务正在运行（active）"
-
-        # 获取服务启动时间
-        启动时间=$(systemctl show "${服务名称}" --property=ActiveEnterTimestamp --value 2>/dev/null)
-        if [ -n "$启动时间" ]; then
-            打印信息 "启动时间：$启动时间"
-        fi
-
-        # 获取服务主进程 PID
-        进程ID=$(systemctl show "${服务名称}" --property=MainPID --value 2>/dev/null)
-        if [ -n "$进程ID" ] && [ "$进程ID" != "0" ]; then
-            打印信息 "主进程 PID：$进程ID"
-        fi
+# ── 1. systemd units / 检查 systemd 服务状态 ─────────────────────────────────
+check_unit() {
+    local unit="$1"
+    if systemctl is-active --quiet "${unit}" 2>/dev/null; then
+        local uptime_info
+        uptime_info=$(systemctl show "${unit}" --property=ActiveEnterTimestamp --value 2>/dev/null || true)
+        echo -e "${PASS} ${unit} 运行中 (active)  启动时间：${uptime_info}"
     else
-        # 检查服务是否存在
-        if systemctl list-units --full --all | grep -q "${服务名称}.service"; then
-            服务状态=$(systemctl show "${服务名称}" --property=ActiveState --value 2>/dev/null)
-            打印失败 "服务未运行，当前状态：$服务状态"
-            打印信息 "尝试启动命令：sudo systemctl start ${服务名称}"
-        else
-            打印失败 "未找到 systemd 服务：${服务名称}"
-            打印信息 "请先运行部署脚本：./scripts/setup_pi.sh"
-        fi
+        echo -e "${FAIL} ${unit} 未运行"
+        echo "    修复：sudo systemctl start ${unit}"
     fi
 }
 
-# -------------------------------------------------------
-# 检查端口监听状态
-# -------------------------------------------------------
-检查端口监听() {
-    echo ""
-    echo -e "\033[1m【2】端口监听状态\033[0m"
-    打印分隔线
+echo ""
+echo -e "\033[1m【1】systemd 服务状态\033[0m"
+check_unit "v2c-server.service"
+check_unit "v2c-report.timer"
 
-    if ss -tlnp 2>/dev/null | grep -q ":${服务端口}"; then
-        打印成功 "端口 ${服务端口} 正在监听"
+# ── 2. HTTP healthcheck / HTTP 健康检查 ──────────────────────────────────────
+echo ""
+echo -e "\033[1m【2】HTTP 健康检查\033[0m"
 
-        # 获取监听该端口的进程信息
-        进程信息=$(ss -tlnp 2>/dev/null | grep ":${服务端口}" | awk '{print $NF}' | head -1)
-        if [ -n "$进程信息" ]; then
-            打印信息 "监听进程：$进程信息"
-        fi
+if ! command -v curl &>/dev/null; then
+    echo -e "${FAIL} curl 未安装 — 请先安装: sudo apt install curl"
+    exit 1
+fi
+
+HTTP_CODE=$(curl -s -o /tmp/v2c_health.json -w "%{http_code}" --max-time 5 "$URL" 2>/dev/null || echo "000")
+
+if [ "$HTTP_CODE" = "200" ]; then
+    echo -e "${PASS} HTTP /health → 200 OK"
+    if command -v python3 &>/dev/null; then
+        STATUS=$(python3 -c "import json; d=json.load(open('/tmp/v2c_health.json')); print(d.get('status','?'))" 2>/dev/null || echo "?")
+        DB=$(python3 -c "import json; d=json.load(open('/tmp/v2c_health.json')); print(d.get('db','?'))" 2>/dev/null || echo "?")
+        UPTIME=$(python3 -c "import json; d=json.load(open('/tmp/v2c_health.json')); print(round(d.get('uptime',0)))" 2>/dev/null || echo "?")
+        echo -e "         status=${STATUS}  db=${DB}  uptime=${UPTIME}s"
     else
-        打印失败 "端口 ${服务端口} 未在监听"
-        打印信息 "请确认服务已启动，或检查 .env 文件中的端口配置"
+        cat /tmp/v2c_health.json
     fi
-}
+else
+    echo -e "${FAIL} HTTP /health → ${HTTP_CODE}（预期 200）"
+    echo "    响应内容："
+    cat /tmp/v2c_health.json 2>/dev/null || true
+fi
 
-# -------------------------------------------------------
-# 检查 HTTP 接口响应
-# -------------------------------------------------------
-检查接口响应() {
-    echo ""
-    echo -e "\033[1m【3】HTTP 接口响应检查\033[0m"
-    打印分隔线
-
-    # 检查 curl 是否可用
-    if ! command -v curl &>/dev/null; then
-        打印信息 "curl 未安装，跳过 HTTP 检查"
-        return
-    fi
-
-    测试地址="http://127.0.0.1:${服务端口}"
-
-    # 发送 HTTP GET 请求，超时 5 秒
-    HTTP状态码=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${测试地址}" 2>/dev/null)
-
-    if [ "$HTTP状态码" -ge 200 ] && [ "$HTTP状态码" -lt 400 ] 2>/dev/null; then
-        打印成功 "HTTP 接口响应正常，状态码：${HTTP状态码}"
-    elif [ "$HTTP状态码" = "000" ] || [ -z "$HTTP状态码" ]; then
-        打印失败 "HTTP 接口无响应（连接超时或拒绝）"
-        打印信息 "请检查服务是否已启动，以及防火墙配置"
+# ── 3. Port listen check / 端口监听检查 ──────────────────────────────────────
+echo ""
+echo -e "\033[1m【3】端口监听状态\033[0m"
+if command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ":${PORT}"; then
+        echo -e "${PASS} 端口 ${PORT} 正在监听"
     else
-        打印信息 "HTTP 接口返回状态码：${HTTP状态码}（服务可能正常，具体取决于接口设计）"
+        echo -e "${FAIL} 端口 ${PORT} 未监听"
     fi
+fi
 
-    # 本机局域网 IP
-    本机IP=$(hostname -I | awk '{print $1}')
-    打印信息 "局域网访问地址：http://${本机IP}:${服务端口}"
-}
-
-# -------------------------------------------------------
-# 检查系统资源使用情况
-# -------------------------------------------------------
-检查系统资源() {
-    echo ""
-    echo -e "\033[1m【4】系统资源使用情况\033[0m"
-    打印分隔线
-
-    # CPU 使用率（取 1 秒平均值）
-    CPU使用率=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//' 2>/dev/null || echo "未知")
-    打印信息 "CPU 使用率：${CPU使用率}%"
-
-    # 内存使用情况
-    内存信息=$(free -h | awk '/^Mem:/ {printf "总量 %s / 已用 %s / 可用 %s", $2, $3, $7}' 2>/dev/null)
-    打印信息 "内存：${内存信息}"
-
-    # 磁盘使用情况（根目录）
-    磁盘信息=$(df -h / | awk 'NR==2 {printf "总量 %s / 已用 %s / 可用 %s（使用率 %s）", $2, $3, $4, $5}' 2>/dev/null)
-    打印信息 "磁盘（根目录）：${磁盘信息}"
-
-    # 系统运行时长
-    系统运行时长=$(uptime -p 2>/dev/null || uptime | awk -F'up' '{print $2}' | awk -F',' '{print $1}')
-    打印信息 "系统已运行：${系统运行时长}"
-
-    # CPU 温度（树莓派专有）
-    温度文件="/sys/class/thermal/thermal_zone0/temp"
-    if [ -f "$温度文件" ]; then
-        温度原始值=$(cat "$温度文件")
-        温度摄氏度=$(echo "scale=1; $温度原始值 / 1000" | bc 2>/dev/null || echo "未知")
-        打印信息 "CPU 温度：${温度摄氏度}°C"
-    fi
-}
-
-# -------------------------------------------------------
-# 显示最近的服务日志
-# -------------------------------------------------------
-显示最近日志() {
-    echo ""
-    echo -e "\033[1m【5】最近 ${日志行数} 条服务日志\033[0m"
-    打印分隔线
-
-    if systemctl list-units --full --all 2>/dev/null | grep -q "${服务名称}.service"; then
-        sudo journalctl -u "${服务名称}.service" -n "${日志行数}" --no-pager 2>/dev/null || \
-            打印信息 "无法获取日志，请尝试：sudo journalctl -u ${服务名称} -n ${日志行数}"
+# ── 4. Docker / Anisette ─────────────────────────────────────────────────────
+echo ""
+echo -e "\033[1m【4】Docker / Anisette 容器\033[0m"
+if command -v docker &>/dev/null; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^anisette$'; then
+        echo -e "${PASS} Docker 容器 'anisette' 正在运行"
     else
-        打印信息 "服务未注册到 systemd，无法获取日志"
+        echo -e "${FAIL} Docker 容器 'anisette' 未运行"
+        echo "    修复：docker start anisette"
     fi
-}
+else
+    echo -e "${INFO}  Docker 未安装 — 跳过 Anisette 检查"
+fi
 
-# -------------------------------------------------------
-# 打印帮助信息
-# -------------------------------------------------------
-打印帮助信息() {
-    echo ""
-    echo -e "\033[1m【常用管理命令】\033[0m"
-    打印分隔线
-    echo -e "  启动服务：  \033[33msudo systemctl start ${服务名称}\033[0m"
-    echo -e "  停止服务：  \033[33msudo systemctl stop ${服务名称}\033[0m"
-    echo -e "  重启服务：  \033[33msudo systemctl restart ${服务名称}\033[0m"
-    echo -e "  查看状态：  \033[33msudo systemctl status ${服务名称}\033[0m"
-    echo -e "  实时日志：  \033[33msudo journalctl -u ${服务名称} -f\033[0m"
-    echo -e "  禁用自启：  \033[33msudo systemctl disable ${服务名称}\033[0m"
-    echo -e "  启用自启：  \033[33msudo systemctl enable ${服务名称}\033[0m"
-    echo ""
-}
+# ── 5. Database / 数据库检查 ─────────────────────────────────────────────────
+echo ""
+echo -e "\033[1m【5】数据库文件\033[0m"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DB_FILE="${PROJECT_DIR}/reports.db"
+if [ -f "$DB_FILE" ]; then
+    DB_SIZE=$(du -sh "$DB_FILE" | cut -f1)
+    echo -e "${PASS} 数据库存在：${DB_FILE} (${DB_SIZE})"
+else
+    echo -e "${FAIL} 数据库不存在：${DB_FILE}"
+    echo "    请先运行：python3 request_reports.py（完成 Apple 认证）"
+fi
 
-# -------------------------------------------------------
-# 主流程
-# -------------------------------------------------------
-主流程() {
-    echo ""
-    echo -e "\033[36m================================================\033[0m"
-    echo -e "\033[36m    V2C Project — 服务状态检查报告\033[0m"
-    echo -e "\033[36m    检查时间：$(date '+%Y年%m月%d日 %H:%M:%S')\033[0m"
-    echo -e "\033[36m================================================\033[0m"
-
-    检查服务状态
-    检查端口监听
-    检查接口响应
-    检查系统资源
-    显示最近日志
-    打印帮助信息
-}
-
-# 执行主流程
-主流程
+echo ""
+echo "────────────────────────────────────────"
+echo -e "${INFO}  完成。详细部署指南：docs/raspberry-pi-deploy.md"
