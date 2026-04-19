@@ -1,0 +1,65 @@
+# =============================================================
+# V2C Project 后端服务 — systemd 服务单元文件
+# 功能：管理 V2C 后端进程的启动、停止、重启及开机自启
+# 使用方法：
+#   sudo cp 本文件 /etc/systemd/system/v2c-backend.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable v2c-backend.service   # 设置开机自启
+#   sudo systemctl start  v2c-backend.service   # 立即启动
+#   sudo systemctl status v2c-backend.service   # 查看运行状态
+# =============================================================
+
+[Unit]
+# 服务的简要描述，显示在 systemctl status 输出中
+Description=V2C Project 后端服务（视觉与控制协同系统）
+
+# 声明本服务依赖网络已就绪后才启动
+After=network.target
+
+# 同时要求网络在线，网络断开则等待重连
+Wants=network-online.target
+
+[Service]
+# 服务类型：simple 表示 ExecStart 命令就是主进程
+Type=simple
+
+# 运行服务的操作系统用户（把 pi 替换成你的实际用户名）
+User=pi
+
+# 运行服务的操作系统用户组
+Group=pi
+
+# 服务的工作目录（项目根目录，根据实际路径修改）
+WorkingDirectory=/home/pi/v2c-project
+
+# 加载项目根目录下的 .env 环境变量文件
+EnvironmentFile=/home/pi/v2c-project/.env
+
+# 启动服务的命令（使用绝对路径，避免 PATH 问题）
+# 如果使用 Node.js 后端，取消下面的注释并按实际修改：
+ExecStart=/usr/bin/node /home/pi/v2c-project/server.js
+
+# 如果使用 Python 后端，取消下面的注释并按实际修改：
+# ExecStart=/usr/bin/python3 /home/pi/v2c-project/app.py
+
+# 服务异常退出后自动重启（守护进程模式）
+Restart=on-failure
+
+# 重启前等待 5 秒，避免快速重启循环消耗资源
+RestartSec=5s
+
+# 服务的标准输出和标准错误均写入 systemd 日志
+# 查看日志命令：sudo journalctl -u v2c-backend.service -f
+StandardOutput=journal
+StandardError=journal
+
+# 给服务设置一个日志标识符，便于过滤
+SyslogIdentifier=v2c-backend
+
+# 限制服务可以打开的最大文件描述符数量（防止资源泄露）
+LimitNOFILE=65536
+
+[Install]
+# WantedBy=multi-user.target 表示系统进入多用户模式时启动本服务
+# 即：正常开机登录后自动运行
+WantedBy=multi-user.target
