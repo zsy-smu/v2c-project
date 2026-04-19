@@ -1,0 +1,78 @@
+# ============================================================
+# V2C Project — systemd 服务配置文件
+# 文件路径：/etc/systemd/system/v2c-project.service
+#
+# 使用说明：
+#   1. 将本文件复制到 /etc/systemd/system/
+#      sudo cp systemd/v2c-project.service /etc/systemd/system/
+#   2. 重新加载 systemd 守护进程：
+#      sudo systemctl daemon-reload
+#   3. 启动服务：
+#      sudo systemctl start v2c-project
+#   4. 设置开机自启：
+#      sudo systemctl enable v2c-project
+#   5. 查看运行状态：
+#      sudo systemctl status v2c-project
+# ============================================================
+
+[Unit]
+# 服务名称与描述（中文可见于 systemctl status）
+Description=V2C Project — 视觉与控制协同系统后端服务
+# 服务文档地址（可选，指向项目 README 或部署文档）
+Documentation=https://github.com/zsy-smu/v2c-project
+# 在网络服务就绪后再启动本服务（依赖网络时使用）
+After=network-online.target
+# 要求网络真正就绪（推荐保留）
+Wants=network-online.target
+
+[Service]
+# 服务类型：
+#   simple  — 主进程即服务进程（最常用）
+#   forking — 父进程 fork 后退出（适合 daemon 模式）
+#   notify  — 进程主动通知 systemd 就绪状态
+Type=simple
+
+# 运行服务的用户（替换为你的实际用户名，避免以 root 运行）
+User=pi
+# 运行服务的用户组
+Group=pi
+
+# 服务的工作目录（替换为项目实际路径）
+WorkingDirectory=/home/pi/v2c-project
+
+# 加载环境变量文件（包含密钥、端口等敏感配置，不提交到 git）
+EnvironmentFile=/home/pi/v2c-project/.env
+
+# 服务启动命令（根据项目实际技术栈二选一，注释掉不用的那行）
+# ----- Node.js 项目 -----
+ExecStart=/usr/bin/node /home/pi/v2c-project/index.js
+# ----- Python 项目 -----
+# ExecStart=/usr/bin/python3 /home/pi/v2c-project/main.py
+
+# 服务异常退出后自动重启（保障 7x24 运行）
+Restart=on-failure
+# 重启前等待时间（秒），防止快速崩溃循环
+RestartSec=5
+# 最多连续重启次数（超过后停止尝试，避免无效消耗）
+StartLimitBurst=5
+# 重启计数统计周期（秒）
+StartLimitIntervalSec=60
+
+# 标准输出日志写入 systemd journal（可用 journalctl 查看）
+StandardOutput=journal
+# 错误输出同上
+StandardError=journal
+# 日志中显示的服务标识前缀（方便过滤）
+SyslogIdentifier=v2c-project
+
+# 安全加固（可选，限制服务权限，提升系统安全性）
+# 禁止服务写入 /etc、/usr 等系统目录
+ProtectSystem=full
+# 限制服务对 /home 目录的访问（read-only 允许读取本用户配置文件，true 会导致无法读取 .env）
+ProtectHome=read-only
+# 禁止服务提升为 root 权限
+NoNewPrivileges=true
+
+[Install]
+# 在 multi-user.target（多用户模式，即正常开机）时启用
+WantedBy=multi-user.target
