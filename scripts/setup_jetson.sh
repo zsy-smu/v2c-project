@@ -225,7 +225,7 @@ set -e
         打印信息 "使用通用服务文件"
     else
         打印错误 "未找到服务文件，请确认 deploy/systemd/ 目录下有 .service 文件"
-        return 1
+        exit 1
     fi
 
     # 将服务文件中的用户和路径占位符替换为当前用户名

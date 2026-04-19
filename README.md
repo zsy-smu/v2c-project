@@ -53,7 +53,7 @@ chmod +x scripts/setup_jetson.sh
 
 ```bash
 # 脚本执行完成后，编辑 .env 文件填写实际配置
-nano ~/.../v2c-project/.env
+nano ~/v2c-project/.env
 ```
 
 ### 第四步：验证部署
