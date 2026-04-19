@@ -1,0 +1,11 @@
+[Unit]
+Description=V2C Project — NinjiaTag Report Fetcher Timer (every 5 min)
+Documentation=https://github.com/zsy-smu/v2c-project
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=5min
+Unit=v2c-report.service
+
+[Install]
+WantedBy=timers.target
