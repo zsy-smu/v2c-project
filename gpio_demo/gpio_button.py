@@ -2,31 +2,35 @@
 # =============================================================
 # V2C Project — GPIO 物理按键触发后端接口示例
 # 文件：gpio_demo/gpio_button.py
-# 功能：监听树莓派物理按键，按下时向后端服务发送 HTTP 请求
+# 功能：监听物理按键，按下时向后端服务发送 HTTP 请求
 # 默认状态：关闭（需通过环境变量 启用GPIO按键=true 开启）
+#
+# 支持设备：
+#   - 树莓派（使用 RPi.GPIO 库）
+#   - NVIDIA Jetson Orin Nano / Nano / Xavier 等（使用 Jetson.GPIO 库）
+#   脚本会自动检测当前设备并选择正确的库，无需手动修改代码
 #
 # 硬件接线说明：
 #   - 轻触按钮一端 → GPIO 17 引脚（物理引脚 11）
 #   - 轻触按钮另一端 → GND（物理引脚 6，或任意 GND 引脚）
 #   - 内部上拉电阻已启用，无需额外连接 3.3V
 #
-# 树莓派引脚对照（BCM 编号）：
+# 引脚对照（BCM 编号，树莓派与 Jetson 40 针接口相同）：
 #   物理引脚 1  = 3.3V 电源
 #   物理引脚 6  = GND 接地
 #   物理引脚 11 = GPIO 17（本脚本默认按钮引脚）
 #   物理引脚 13 = GPIO 27（可选备用引脚）
 #
-# 使用方法：
-#   # 安装依赖（树莓派 OS 通常已预装）
-#   sudo apt install -y python3-rpi.gpio python3-requests
-#
-#   # 设置环境变量开启 GPIO 功能
+# 使用方法（树莓派）：
+#   sudo apt install -y python3-rpi.gpio
 #   export 启用GPIO按键=true
-#
-#   # 运行脚本
 #   python3 gpio_demo/gpio_button.py
 #
-#   # 或作为 systemd 服务运行（参考 deploy/systemd/ 目录）
+# 使用方法（Jetson Orin Nano / JetPack 6.1）：
+#   sudo pip3 install Jetson.GPIO
+#   sudo usermod -aG gpio $USER   # 重新登录 SSH 使权限生效
+#   export 启用GPIO按键=true
+#   python3 gpio_demo/gpio_button.py
 # =============================================================
 
 import os
@@ -77,19 +81,31 @@ def 检查GPIO功能是否开启():
 
 def 导入GPIO库():
     """
-    导入 RPi.GPIO 库，仅在树莓派上可用。
-    如果在非树莓派设备上运行，会抛出导入错误并给出提示。
+    自动检测当前设备类型，优先尝试 Jetson.GPIO（Jetson 设备），
+    fallback 到 RPi.GPIO（树莓派）。两个库的 API 接口完全兼容。
     """
+    # 优先尝试 Jetson.GPIO（NVIDIA Jetson 系列设备）
+    try:
+        import Jetson.GPIO as GPIO
+        日志.info("检测到 Jetson 设备，使用 Jetson.GPIO 库")
+        return GPIO
+    except (ImportError, RuntimeError):
+        pass
+
+    # Fallback：尝试 RPi.GPIO（树莓派）
     try:
         import RPi.GPIO as GPIO
+        日志.info("检测到树莓派设备，使用 RPi.GPIO 库")
         return GPIO
     except ImportError:
-        日志.error("无法导入 RPi.GPIO 库")
-        日志.error("请确认：1) 当前设备是树莓派  2) 已安装：sudo apt install python3-rpi.gpio")
+        日志.error("无法导入 GPIO 库（Jetson.GPIO 和 RPi.GPIO 均不可用）")
+        日志.error("Jetson 设备请安装：sudo pip3 install Jetson.GPIO")
+        日志.error("树莓派请安装：sudo apt install python3-rpi.gpio")
         sys.exit(1)
     except RuntimeError as 错误:
         日志.error(f"GPIO 初始化失败：{错误}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
+        日志.error("Jetson：sudo usermod -aG gpio $USER  （重新登录 SSH 后生效）")
         sys.exit(1)
 
 

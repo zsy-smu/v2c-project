@@ -7,6 +7,11 @@
 #   sudo systemctl enable v2c-backend.service   # 设置开机自启
 #   sudo systemctl start  v2c-backend.service   # 立即启动
 #   sudo systemctl status v2c-backend.service   # 查看运行状态
+#
+# 用户名说明：
+#   - Jetson（JetPack 6.1）默认用户为 nvidia，setup_jetson.sh 会自动替换
+#   - 树莓派默认用户为 pi，setup_pi.sh 会自动替换
+#   - 两个脚本均通过 sed 自动替换 User/Group/WorkingDirectory/EnvironmentFile
 # =============================================================
 
 [Unit]
