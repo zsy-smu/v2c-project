@@ -1,7 +1,7 @@
 # =============================================================
 # V2C Project — GPIO 按键功能说明
 # =============================================================
-# 此目录包含树莓派 GPIO 物理按键触发后端接口的示例代码。
+# 此目录包含 Jetson GPIO 物理按键触发后端接口的示例代码。
 # 默认为关闭状态，需通过环境变量开启。
 #
 # 文件说明：
@@ -18,14 +18,14 @@
 
 ## 所需硬件
 
-- 树莓派（任意型号，带 GPIO 接口）
+- Jetson Orin Nano（或其他支持 Jetson.GPIO 的 Jetson 设备）
 - 轻触按钮（Tactile Switch）× 1
 - 杜邦线（母对母）× 2
 
 ## 接线方法
 
 ```
-树莓派引脚                  按钮
+Jetson 引脚                  按钮
 ─────────────────────────────────────
 物理引脚 11  (GPIO 17) ──── 按钮引脚 A
 物理引脚  6  (GND)    ──── 按钮引脚 B
@@ -34,15 +34,12 @@
 
 内部上拉电阻已在代码中启用，无需外接电阻。
 
-## 树莓派 40 针引脚图（部分）
+## Jetson 引脚说明
 
 ```
-       3.3V [1]  [2] 5V
-  GPIO 2   [3]  [4] 5V
-  GPIO 3   [5]  [6] GND  ← 接按钮另一端
-  GPIO 4   [7]  [8] GPIO 14
-       GND [9] [10] GPIO 15
-  GPIO 17 [11] [12] GPIO 18  ← 接按钮一端（默认引脚）
+请以 Jetson Orin Nano 对应的官方 Pinout 图为准：  
+https://developer.nvidia.com/embedded/learn/jetson-orin-nano-devkit-user-guide/hardware_spec.html
+建议默认使用 `GPIO按钮引脚=17`，并将另一端接地（GND）。
 ```
 
 ## 环境变量配置
@@ -59,6 +56,9 @@ GPIO触发接口路径=/api/trigger  # 触发的后端接口路径
 ## 运行命令
 
 ```bash
+# 安装 Jetson GPIO 库（首次部署）
+pip3 install Jetson.GPIO
+
 # 直接运行（前台运行，Ctrl+C 停止）
 python3 gpio_demo/gpio_button.py
 

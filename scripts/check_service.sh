@@ -69,7 +69,7 @@
             打印信息 "尝试启动命令：sudo systemctl start ${服务名称}"
         else
             打印失败 "未找到 systemd 服务：${服务名称}"
-            打印信息 "请先运行部署脚本：./scripts/setup_pi.sh"
+            打印信息 "请先运行部署脚本：./scripts/setup_jetson.sh"
         fi
     fi
 }
@@ -153,7 +153,7 @@
     系统运行时长=$(uptime -p 2>/dev/null || uptime | awk -F'up' '{print $2}' | awk -F',' '{print $1}')
     打印信息 "系统已运行：${系统运行时长}"
 
-    # CPU 温度（树莓派专有）
+    # CPU 温度（Jetson/树莓派等 Linux 边缘设备通常可用）
     温度文件="/sys/class/thermal/thermal_zone0/temp"
     if [ -f "$温度文件" ]; then
         温度原始值=$(cat "$温度文件")
