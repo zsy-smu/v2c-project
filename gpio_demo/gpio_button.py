@@ -10,7 +10,9 @@
 #   - 轻触按钮另一端 → GND（物理引脚 6，或任意 GND 引脚）
 #   - 内部上拉电阻已启用，无需额外连接 3.3V
 #
-# Jetson 引脚对照请参考官方 Pinout（本脚本默认 BCM GPIO 17）
+# Jetson 引脚对照请参考官方 Pinout（Jetson Orin Nano Dev Kit）：
+# https://developer.nvidia.com/embedded/learn/jetson-orin-nano-devkit-user-guide/hardware_spec.html
+# 本脚本默认 BCM GPIO 17
 #
 # 使用方法：
 #   # 安装依赖（Jetson）
@@ -97,7 +99,7 @@ def 导入GPIO库():
     except RuntimeError as 错误:
         RPi导入错误 = 错误
 
-    if any(isinstance(错误, RuntimeError) for 错误 in (Jetson导入错误, RPi导入错误)):
+    if any(isinstance(错误, RuntimeError) for 错误 in (Jetson导入错误, RPi导入错误) if 错误 is not None):
         日志.error(f"GPIO 初始化失败：Jetson={Jetson导入错误}, RPi={RPi导入错误}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
     else:

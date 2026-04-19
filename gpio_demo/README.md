@@ -37,7 +37,8 @@ Jetson 引脚                  按钮
 ## Jetson 引脚说明
 
 ```
-请以 Jetson Orin Nano 对应的官方 Pinout 图为准。
+请以 Jetson Orin Nano 对应的官方 Pinout 图为准：  
+https://developer.nvidia.com/embedded/learn/jetson-orin-nano-devkit-user-guide/hardware_spec.html
 建议默认使用 `GPIO按钮引脚=17`，并将另一端接地（GND）。
 ```
 
