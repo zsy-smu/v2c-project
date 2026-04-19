@@ -1,12 +1,21 @@
 # =============================================================
 # V2C Project 后端服务 — systemd 服务单元文件
 # 功能：管理 V2C 后端进程的启动、停止、重启及开机自启
+#
 # 使用方法：
+#   # 方式一：使用一键部署脚本（推荐，自动适配当前用户名和路径）
+#   ./scripts/setup_pi.sh        # 树莓派
+#   ./scripts/setup_jetson.sh    # Jetson
+#
+#   # 方式二：手动部署（需先修改下方 User / Group / WorkingDirectory 等路径）
 #   sudo cp 本文件 /etc/systemd/system/v2c-backend.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable v2c-backend.service   # 设置开机自启
 #   sudo systemctl start  v2c-backend.service   # 立即启动
 #   sudo systemctl status v2c-backend.service   # 查看运行状态
+#
+# 默认配置适用于 Jetson（用户名 nvidia）
+# 树莓派用户请将下方所有 nvidia 替换为 pi
 # =============================================================
 
 [Unit]
@@ -23,24 +32,28 @@ Wants=network-online.target
 # 服务类型：simple 表示 ExecStart 命令就是主进程
 Type=simple
 
-# 运行服务的操作系统用户（把 pi 替换成你的实际用户名）
-User=pi
+# 运行服务的操作系统用户
+# Jetson 默认用户：nvidia
+# 树莓派默认用户：pi
+# 请将下方用户名替换为你的实际用户名
+User=nvidia
 
 # 运行服务的操作系统用户组
-Group=pi
+Group=nvidia
 
 # 服务的工作目录（项目根目录，根据实际路径修改）
-WorkingDirectory=/home/pi/v2c-project
+WorkingDirectory=/home/nvidia/v2c-project
 
 # 加载项目根目录下的 .env 环境变量文件
-EnvironmentFile=/home/pi/v2c-project/.env
+# 注意：systemd EnvironmentFile 只支持 ASCII key 名称（已在 .env.example 中修正）
+EnvironmentFile=/home/nvidia/v2c-project/.env
 
 # 启动服务的命令（使用绝对路径，避免 PATH 问题）
 # 如果使用 Node.js 后端，取消下面的注释并按实际修改：
-ExecStart=/usr/bin/node /home/pi/v2c-project/server.js
+ExecStart=/usr/bin/node /home/nvidia/v2c-project/server.js
 
 # 如果使用 Python 后端，取消下面的注释并按实际修改：
-# ExecStart=/usr/bin/python3 /home/pi/v2c-project/app.py
+# ExecStart=/usr/bin/python3 /home/nvidia/v2c-project/app.py
 
 # 服务异常退出后自动重启（守护进程模式）
 Restart=on-failure

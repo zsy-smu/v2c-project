@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================
-# V2C Project — 树莓派一键部署脚本
-# 文件：scripts/setup_pi.sh
-# 适用：树莓派 4B / 5，Raspberry Pi OS Lite 64-bit
-# 使用方法：
-#   chmod +x scripts/setup_pi.sh
-#   ./scripts/setup_pi.sh
+# V2C Project — Jetson 一键部署脚本
+# 文件：scripts/setup_jetson.sh
+# 适用：NVIDIA Jetson Orin Nano / Xavier / Nano，JetPack 5.x / 6.x
+# 使用方法（在 Jetson 上 MobaXterm/SSH 终端中执行）：
+#   chmod +x scripts/setup_jetson.sh
+#   ./scripts/setup_jetson.sh
 #
-# Jetson 用户请改用：scripts/setup_jetson.sh
+# 树莓派用户请改用：scripts/setup_pi.sh
 # =============================================================
 
 # 设置脚本在任意命令失败时立即退出，避免错误继续蔓延
@@ -60,6 +60,24 @@ set -e
 }
 
 # -------------------------------------------------------
+# 检查 Jetson 环境
+# -------------------------------------------------------
+检查Jetson环境() {
+    打印标题 "环境检查：Jetson / JetPack"
+
+    if [ -f /etc/nv_tegra_release ]; then
+        打印信息 "检测到 Jetson 设备 ✓"
+        打印信息 "  JetPack 版本信息：$(head -1 /etc/nv_tegra_release)"
+    else
+        打印警告 "未检测到标准 Jetson 环境（/etc/nv_tegra_release 不存在）"
+        打印警告 "脚本将继续运行，但部分 Jetson 专属步骤可能跳过"
+    fi
+
+    打印信息 "  系统版本：$(uname -a)"
+    打印信息 "  当前用户：$当前用户"
+}
+
+# -------------------------------------------------------
 # 第一步：更新系统软件包
 # -------------------------------------------------------
 更新系统() {
@@ -106,16 +124,35 @@ set -e
 }
 
 # -------------------------------------------------------
-# 第四步：安装 Python 环境（树莓派专用：RPi.GPIO）
+# 第四步：安装 Python 环境（Jetson 专用：Jetson.GPIO）
 # -------------------------------------------------------
 安装Python环境() {
-    打印标题 "第四步：安装 Python 3 运行环境（树莓派）"
+    打印标题 "第四步：安装 Python 3 运行环境（Jetson）"
 
-    打印信息 "正在安装 Python 3、pip 及树莓派 GPIO 库..."
-    sudo apt install -y python3 python3-pip python3-venv python3-rpi.gpio -qq
+    打印信息 "正在安装 Python 3、pip..."
+    sudo apt install -y python3 python3-pip python3-venv -qq
 
     打印信息 "Python 环境安装完成 ✓"
     打印信息 "  Python 版本：$(python3 --version)"
+
+    # 安装 Jetson.GPIO（Jetson 专用 GPIO 库，与 RPi.GPIO API 兼容）
+    打印信息 "正在安装 Jetson.GPIO..."
+    if pip3 install Jetson.GPIO -q 2>/dev/null; then
+        打印信息 "Jetson.GPIO 安装完成 ✓"
+    else
+        打印警告 "Jetson.GPIO 安装失败，请手动执行：sudo pip3 install Jetson.GPIO"
+    fi
+
+    # 将当前用户加入 gpio 用户组（避免每次需要 sudo）
+    if getent group gpio > /dev/null 2>&1; then
+        sudo usermod -a -G gpio "$当前用户"
+        打印信息 "已将用户 $当前用户 加入 gpio 用户组（重新登录后生效）✓"
+    else
+        # 创建 gpio 用户组（部分 Jetson 镜像默认无此组）
+        sudo groupadd -f -r gpio
+        sudo usermod -a -G gpio "$当前用户"
+        打印信息 "已创建 gpio 用户组并添加当前用户（重新登录后生效）✓"
+    fi
 }
 
 # -------------------------------------------------------
@@ -154,6 +191,7 @@ set -e
             cp .env.example .env
             打印信息 ".env 文件已从模板创建 ✓"
             打印警告 "请编辑 .env 文件，填写你的实际配置：nano $项目目录/.env"
+            打印警告 "重点配置项：JETSON_DEVICE_IP、CONTROLLER_IP、PORT"
         else
             打印警告 "未找到 .env.example，请手动创建 .env 文件"
         fi
@@ -176,7 +214,7 @@ set -e
         return 1
     fi
 
-    # 将服务文件中的用户占位符替换为当前用户名
+    # 将服务文件中的用户占位符替换为当前用户名（支持 nvidia 或其他用户）
     打印信息 "正在将服务文件中的用户名替换为：$当前用户"
     sudo sed "s/User=nvidia/User=$当前用户/g; s/Group=nvidia/Group=$当前用户/g; s|/home/nvidia|/home/$当前用户|g" \
         "$服务文件" > "/tmp/${服务名称}.service"
@@ -226,15 +264,15 @@ set -e
 # 完成提示
 # -------------------------------------------------------
 打印完成提示() {
-    打印标题 "🎉 部署完成！"
+    打印标题 "🎉 Jetson 部署完成！"
 
     # 获取本机局域网 IP 地址
     本机IP=$(hostname -I | awk '{print $1}')
 
     echo ""
-    打印信息 "V2C 后端服务已成功部署到树莓派！"
+    打印信息 "V2C 后端服务已成功部署到 Jetson！"
     echo ""
-    echo -e "  📡 局域网访问地址：\033[32mhttp://${本机IP}:3000\033[0m"
+    echo -e "  📡 MobaXterm 可访问地址：\033[32mhttp://${本机IP}:3000\033[0m"
     echo -e "  📋 查看服务状态：\033[33msudo systemctl status ${服务名称}\033[0m"
     echo -e "  📋 查看实时日志：\033[33msudo journalctl -u ${服务名称} -f\033[0m"
     echo -e "  📋 手动停止服务：\033[33msudo systemctl stop ${服务名称}\033[0m"
@@ -242,6 +280,8 @@ set -e
     echo ""
     打印警告 "注意：如果 .env 文件中有未填写的配置项，服务可能无法正常运行。"
     打印警告 "请执行：nano $项目目录/.env  完成配置后重启服务。"
+    echo ""
+    打印警告 "提示：GPIO 用户组变更需要重新登录 SSH 后才能生效。"
     echo ""
 }
 
@@ -251,13 +291,14 @@ set -e
 主流程() {
     echo ""
     echo -e "\033[36m====================================================\033[0m"
-    echo -e "\033[36m    V2C Project — 树莓派一键部署脚本 v1.1\033[0m"
+    echo -e "\033[36m    V2C Project — Jetson 一键部署脚本 v1.0\033[0m"
     echo -e "\033[36m    项目目录：$项目目录\033[0m"
     echo -e "\033[36m    当前用户：$当前用户\033[0m"
     echo -e "\033[36m====================================================\033[0m"
     echo ""
 
     检查权限
+    检查Jetson环境
     更新系统
     安装基础工具
     安装Node环境
