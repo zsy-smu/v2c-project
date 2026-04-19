@@ -99,8 +99,13 @@ def 导入GPIO库():
     except RuntimeError as 错误:
         RPi导入错误 = 错误
 
-    if any(isinstance(错误, RuntimeError) for 错误 in (Jetson导入错误, RPi导入错误) if 错误 is not None):
-        日志.error(f"GPIO 初始化失败：Jetson={Jetson导入错误}, RPi={RPi导入错误}")
+    错误列表 = [("Jetson.GPIO", Jetson导入错误), ("RPi.GPIO", RPi导入错误)]
+    失败详情 = [f"{名称}: {错误}" for 名称, 错误 in 错误列表 if 错误 is not None]
+
+    if any(isinstance(错误, RuntimeError) for _, 错误 in 错误列表 if 错误 is not None):
+        日志.error("GPIO 初始化失败：")
+        for 详情 in 失败详情:
+            日志.error(f"  {详情}")
         日志.error("请确认以 root 或 sudo 运行，或将当前用户加入 gpio 用户组")
     else:
         日志.error("无法导入 GPIO 库（Jetson.GPIO / RPi.GPIO）")
