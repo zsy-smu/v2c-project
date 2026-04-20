@@ -1,0 +1,10 @@
+# Scenario: Corridor Follow
+# A simple straight-corridor navigation scenario for Phase 1 smoke tests.
+
+name: corridor_follow
+description: >
+  Navigate a robot along a straight corridor from start to end.
+  The policy must avoid lateral drift while maintaining forward velocity.
+steps: 20
+dt: 0.05
+seed: 42

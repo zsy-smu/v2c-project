@@ -100,3 +100,50 @@ Jetson Orin Nano（视觉推理）
 ---
 
 *维护者：Zsy @ 上海海事大学 | 目标平台：Jetson Orin Nano Super 8G + JetPack 6.1*
+
+---
+
+## EmbodiedBench – Offline Edge-AI Benchmarking (Phase 1)
+
+A lightweight, cloud-free benchmarking scaffold for evaluating robot policies on edge hardware.
+
+### Quick Start
+
+```bash
+# Install (Python 3.10+)
+pip install -e ".[dev]"
+
+# Run the corridor-follow scenario
+python -m embodiedbench.cli run --scenario scenarios/corridor_follow.yaml
+```
+
+Per-step metrics are written to `artifacts/run_<name>_<timestamp>.jsonl`.  
+Each line contains `step_id`, `action`, `latency_ms`, and `timestamp`.
+
+### Project Layout
+
+```
+embodiedbench/
+├── cli.py                  # Typer CLI entry-point
+├── policy/
+│   ├── base.py             # Abstract Policy (observe / act / reset)
+│   └── dummy_adapter.py    # Deterministic DummyPolicy (fixed seed)
+├── scenario/
+│   ├── parser.py           # Pydantic ScenarioConfig schema
+│   └── runner.py           # Step-loop with per-step JSON-Lines logging
+└── runtime/
+    └── profiler.py         # Wall-clock latency context-manager
+
+scenarios/
+└── corridor_follow.yaml    # Example scenario (20 steps, dt=0.05 s)
+
+artifacts/                  # Run outputs (gitignored except .gitkeep)
+tests/
+└── test_runner_smoke.py    # Smoke tests
+```
+
+### Running Tests
+
+```bash
+pytest
+```
