@@ -28,3 +28,11 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# EmbodiedBench run artifacts (keep the directory placeholder)
+artifacts/run_*.jsonl
+
+# Python packaging build artifacts
+*.egg-info/
+dist/
+build/
